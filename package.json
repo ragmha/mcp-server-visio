@@ -1,0 +1,43 @@
+{
+  "name": "mcp-server-visio",
+  "version": "1.0.0",
+  "description": "MCP server for Microsoft Visio diagram automation — generate Azure architecture diagrams via Copilot CLI or any MCP client. Run with npx.",
+  "type": "module",
+  "bin": {
+    "mcp-server-visio": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "visio",
+    "azure",
+    "architecture",
+    "diagrams",
+    "copilot",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "STYLE_GUIDE.md"
+  ]
+}
