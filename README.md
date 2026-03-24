@@ -143,11 +143,28 @@ The server will create a professional Visio diagram with proper Azure icons, tie
 
 ## Architecture
 
-This server uses **PowerShell COM interop** to control Visio — each operation translates to a PowerShell script executed via `child_process`. This means:
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client<br/>(Copilot CLI / VS Code)
+    participant Server as Visio MCP Server<br/>(Node.js)
+    participant PS as PowerShell<br/>(COM Interop)
+    participant Visio as Microsoft Visio
 
-- **Zero native Node.js addons** — no `node-gyp`, no compilation
-- **Full COM control** — same access to Visio's object model as the Python version
-- **Robust error handling** — structured JSON responses from PowerShell
+    Client->>Server: tools/call → add_azure_shape("Front Door", 5, 7)
+    Server->>Server: Resolve stencil + escape inputs
+    Server->>PS: Execute .ps1 script
+    PS->>Visio: COM: Documents.OpenEx("Azure-Web.vssx")
+    PS->>Visio: COM: Page.Drop(master, x, y)
+    PS->>Visio: COM: Apply style guide (rounding, transparency)
+    Visio-->>PS: Shape ID + properties
+    PS-->>Server: JSON result
+    Server-->>Client: { id: 42, name: "Front Door", ... }
+```
+
+- **MCP Client** sends tool calls over stdio
+- **Visio MCP Server** validates inputs, resolves Azure stencils, and generates PowerShell scripts
+- **PowerShell** executes COM automation against Visio — no native Node.js addons required
+- **Microsoft Visio** renders shapes, connectors, and exports diagrams
 
 ## License
 
