@@ -1,24 +1,17 @@
-# Visio MCP Server (npx)
+# Visio MCP Server
 
-A Node.js MCP server that exposes Microsoft Visio diagram operations as tools — generate production-grade Azure architecture diagrams from text descriptions.
-
-Run with a single command:
-
-```bash
-npx mcp-server-visio
-```
+An MCP server that exposes Microsoft Visio diagram operations as tools — generate production-grade Azure architecture diagrams from text descriptions.
 
 Built for **GitHub Copilot CLI** and **VS Code Agent Mode**, but works with any MCP client.
 
 ## Features
 
-- **Azure service icons** — 206 Azure services from official Visio stencils (auto-discovered)
+- **Azure service icons** — 206 Azure services from official Visio stencils
 - **Architecture helpers** — tier bands, containers, connectors with style-guide compliance
 - **Shape operations** — add, modify, remove, connect, and list shapes
 - **Multi-page support** — add pages, switch between them
 - **Export** — PNG, SVG, JPG output
 - **Zero native deps** — uses PowerShell COM interop, no compilation required
-- **npx-ready** — just `npx mcp-server-visio` and go
 
 ## Prerequisites
 
@@ -29,25 +22,20 @@ Built for **GitHub Copilot CLI** and **VS Code Agent Mode**, but works with any 
 
 ## Installation
 
-### Option 1: npx (recommended)
+```bash
+npm install -g mcp-server-visio
+```
 
-No installation needed — just configure and run:
+Or run directly without installing:
 
 ```bash
 npx mcp-server-visio
 ```
 
-### Option 2: Global install
+Or clone for local development:
 
 ```bash
-npm install -g mcp-server-visio
-mcp-server-visio
-```
-
-### Option 3: Local development
-
-```bash
-git clone <repo-url>
+git clone https://github.com/ragmha/mcp-server-visio.git
 cd mcp-server-visio
 npm install
 npm run build
@@ -149,11 +137,10 @@ The server will create a professional Visio diagram with proper Azure icons, tie
 
 ## Architecture
 
-Unlike the Python version which uses `win32com` directly, this Node.js version uses **PowerShell COM interop** — each Visio operation translates to a PowerShell script executed via `child_process`. This gives us:
+This server uses **PowerShell COM interop** to control Visio — each operation translates to a PowerShell script executed via `child_process`. This means:
 
 - **Zero native Node.js addons** — no `node-gyp`, no compilation
-- **Works with npx** — download and run instantly
-- **Same COM control** — full access to Visio's COM object model
+- **Full COM control** — same access to Visio's object model as the Python version
 - **Robust error handling** — structured JSON responses from PowerShell
 
 ## License
