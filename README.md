@@ -4,6 +4,12 @@ An MCP server that exposes Microsoft Visio diagram operations as tools — gener
 
 Built for **GitHub Copilot CLI** and **VS Code Agent Mode**, but works with any MCP client.
 
+## Demo
+
+<p align="center">
+  <img src="assets/demo.gif" alt="Visio MCP Server Demo" width="720">
+</p>
+
 ## Features
 
 - **Azure service icons** — 206 Azure services from official Visio stencils
