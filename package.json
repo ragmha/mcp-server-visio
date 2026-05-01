@@ -1,26 +1,28 @@
 {
-  "name": "mcp-server-visio",
+  "name": "mcp-server-excalidraw",
   "version": "1.0.0",
-  "description": "MCP server for Microsoft Visio diagram automation — generate Azure architecture diagrams via Copilot CLI or any MCP client. Run with npx.",
+  "description": "MCP server for Excalidraw diagram automation — generate Azure architecture diagrams via Copilot CLI or any MCP client. Cross-platform, no native dependencies.",
   "type": "module",
   "bin": {
-    "mcp-server-visio": "./dist/index.js"
+    "mcp-server-excalidraw": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "build:icons": "tsx scripts/build-azure-icons.ts"
   },
   "keywords": [
     "mcp",
-    "visio",
+    "excalidraw",
     "azure",
     "architecture",
     "diagrams",
     "copilot",
-    "model-context-protocol"
+    "model-context-protocol",
+    "cross-platform"
   ],
   "license": "MIT",
   "engines": {
@@ -28,6 +30,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "sharp": "^0.33.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {

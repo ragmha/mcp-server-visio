@@ -1,10 +1,5 @@
 # Recording a Demo GIF
 
-## Recommended Tool: ScreenToGif (Windows)
-
-1. **Download**: https://www.screentogif.com/
-2. **Install** and open it
-
 ## What to Record
 
 Open a terminal and run:
@@ -12,24 +7,24 @@ Open a terminal and run:
 ```
 copilot
 
-> Create a 3-tier Azure architecture diagram with Front Door, 
+> Create a 3-tier Azure architecture diagram with Front Door,
 > VM Scale Sets in 2 availability zones, and Azure SQL with geo-replication
 ```
 
-Let Copilot call the Visio MCP tools — it will:
-1. `create_diagram` → Visio opens with a blank landscape page
-2. `add_tier_band` × 3 → Ingress / Compute / Data tiers
-3. `add_azure_shape` × 5+ → Front Door, VMSS, SQL, etc.
-4. `add_container` → Availability zone boundaries
-5. `connect_shapes` → Styled connectors between services
-6. `export_page` → Saves as PNG
+Let Copilot call the Excalidraw MCP tools — it will:
+1. `create_diagram` → Initializes an empty canvas
+2. `add_container` × 3 → Ingress / Compute / Data tier boundaries
+3. `add_azure_icon` × 5+ → Front Door, VMSS, SQL, etc.
+4. `add_arrow` → Styled connections between services
+5. `save_diagram` → Saves as `.excalidraw`
+6. `export_diagram` → Exports as PNG
 
 ## Recording Tips
 
 - **Window size**: ~1280×720 for good quality
-- **Crop**: Just the terminal + Visio window side by side
+- **Crop**: Just the terminal window
 - **Duration**: 30–60 seconds is ideal
-- **Frame rate**: 15 FPS keeps the file small
+- **Tools**: ScreenToGif (Windows), Kap (macOS), Peek (Linux)
 
 ## After Recording
 

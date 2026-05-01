@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Visio MCP Server
+ * Excalidraw MCP Server
  *
- * Exposes Microsoft Visio diagram operations as MCP tools via stdio transport.
- * Run with: npx mcp-server-visio
+ * Exposes Excalidraw diagram operations as MCP tools via stdio transport.
+ * Run with: npx mcp-server-excalidraw
  *
  * Designed for GitHub Copilot CLI and VS Code Agent Mode.
  * All tools follow STYLE_GUIDE.md conventions automatically.
@@ -13,32 +13,26 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { VisioClient } from "./visio-client.js";
+import { AZURE_ICONS } from "./azure-icons.js";
+import { ExcalidrawEngine } from "./excalidraw-engine.js";
 
 const server = new McpServer({
-  name: "Visio Diagram Server",
+  name: "Excalidraw Diagram Server",
   version: "1.0.0",
 });
 
-const visio = new VisioClient();
+const engine = new ExcalidrawEngine();
 
 // ── Document Management ──────────────────────────────────────
 
 server.tool(
   "create_diagram",
-  `Create a new Visio diagram. The page is automatically set to landscape (11 × 8.5 in) per the style guide.`,
-  {
-    template: z
-      .string()
-      .optional()
-      .describe(
-        'Optional Visio template name or path (e.g. "Basic Diagram.vstx"). Leave empty for a blank drawing.',
-      ),
-  },
-  async ({ template }) => {
+  `Create a new Excalidraw diagram. Initializes an empty canvas ready for elements.`,
+  {},
+  async () => {
     try {
-      const name = visio.createDiagram(template);
-      return { content: [{ type: "text", text: `Created diagram: ${name}` }] };
+      const msg = engine.createDiagram();
+      return { content: [{ type: "text", text: msg }] };
     } catch (e: unknown) {
       return {
         content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
@@ -50,17 +44,15 @@ server.tool(
 
 server.tool(
   "save_diagram",
-  "Save the active Visio diagram to a file.",
+  "Save the current diagram to an .excalidraw file. Can be opened in excalidraw.com or the Excalidraw VS Code extension.",
   {
     file_path: z
       .string()
-      .describe(
-        'Full path to save (e.g. "C:/Users/me/diagrams/arch.vsdx")',
-      ),
+      .describe('Full path to save (e.g. "~/diagrams/arch.excalidraw"). Extension .excalidraw is added if missing.'),
   },
   async ({ file_path }) => {
     try {
-      const path = visio.saveDiagram(file_path);
+      const path = engine.saveDiagram(file_path);
       return { content: [{ type: "text", text: `Saved to: ${path}` }] };
     } catch (e: unknown) {
       return {
@@ -72,208 +64,95 @@ server.tool(
 );
 
 server.tool(
-  "close_diagram",
-  "Close the active Visio diagram without saving.",
-  {},
-  async () => {
-    try {
-      const msg = visio.closeDiagram();
-      return { content: [{ type: "text", text: msg }] };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "list_open_diagrams",
-  "List all open Visio documents with their page counts.",
-  {},
-  async () => {
-    try {
-      const docs = visio.listOpenDiagrams();
-      if (docs.length === 0)
-        return { content: [{ type: "text", text: "No open documents." }] };
-      return {
-        content: [{ type: "text", text: JSON.stringify(docs, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-// ── Shape Operations ─────────────────────────────────────────
-
-server.tool(
-  "add_shape",
-  `Add a basic shape to the active Visio page.
-Shapes are automatically styled: rounded corners (0.06 in), semi-transparent fills (15%).
-For Azure service icons use add_azure_shape instead — it drops real stencil masters.`,
+  "export_diagram",
+  'Export the current diagram as an image file. Supports .excalidraw, .svg, .png, and .jpg formats. The format is determined by the file extension.',
   {
-    shape_type: z
+    file_path: z
       .string()
-      .describe(
-        "Type of shape: rectangle, square, ellipse, circle, diamond, triangle, rounded_rectangle, star. Or any master name from an open stencil.",
-      ),
-    x: z.number().describe("Horizontal position in inches from left edge."),
-    y: z.number().describe("Vertical position in inches from bottom edge."),
+      .describe('Output path with extension (e.g. "output.svg", "arch.png", "diagram.excalidraw").'),
+  },
+  async ({ file_path }) => {
+    try {
+      const path = await engine.exportDiagram(file_path);
+      return { content: [{ type: "text", text: `Exported to: ${path}` }] };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
+  "get_diagram_info",
+  "Get summary information about the current diagram: element count, arrow count, and bounding box.",
+  {},
+  async () => {
+    try {
+      const info = engine.getDiagramInfo();
+      return {
+        content: [{ type: "text", text: JSON.stringify(info, null, 2) }],
+      };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ── Element Operations ───────────────────────────────────────
+
+server.tool(
+  "add_element",
+  `Add a shape element to the diagram.
+Shapes are styled with clean lines (roughness=0), solid fills.
+Use add_azure_icon for Azure service icons — it embeds real SVG icons.`,
+  {
+    element_type: z
+      .enum(["rectangle", "ellipse", "diamond"])
+      .describe("Type of shape to add."),
+    x: z.number().describe("X position in pixels from left edge."),
+    y: z.number().describe("Y position in pixels from top edge."),
+    width: z.number().describe("Width in pixels."),
+    height: z.number().describe("Height in pixels."),
     text: z.string().optional().describe("Label text to display inside the shape."),
-    width: z.number().optional().describe("Width in inches (0 = default)."),
-    height: z.number().optional().describe("Height in inches (0 = default)."),
-    fill_color: z
+    stroke_color: z
       .string()
       .optional()
-      .describe(
-        'Fill color as hex RGB (e.g. "FF0000") or named: azure_blue, dark_blue, teal, orange, purple, green, red.',
-      ),
+      .describe('Stroke color as hex (e.g. "#0078D7") or named: azure_blue, dark_blue, teal, orange, purple, green, red.'),
+    background_color: z
+      .string()
+      .optional()
+      .describe("Fill color (hex or named Azure color). Use 'transparent' for no fill."),
+    fill_style: z
+      .enum(["solid", "hachure", "cross-hatch"])
+      .optional()
+      .describe("Fill pattern style. Defaults to solid."),
+    stroke_style: z
+      .enum(["solid", "dashed", "dotted"])
+      .optional()
+      .describe("Stroke line style. Defaults to solid."),
+    stroke_width: z.number().optional().describe("Stroke width in pixels. Defaults to 2."),
+    opacity: z.number().min(0).max(100).optional().describe("Opacity from 0 (invisible) to 100 (fully opaque). Defaults to 100."),
   },
-  async ({ shape_type, x, y, text, width, height, fill_color }) => {
+  async ({ element_type, x, y, width, height, text, stroke_color, background_color, fill_style, stroke_style, stroke_width, opacity }) => {
     try {
-      const result = visio.addShape(
-        shape_type,
-        x,
-        y,
-        text ?? "",
-        width ?? 0,
-        height ?? 0,
-        fill_color,
-      );
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "add_azure_shape",
-  `Add an Azure service icon from the official Azure Visio stencils.
-ALWAYS prefer this over add_shape for Azure architecture diagrams.
-The tool automatically opens the correct stencil file and drops the real Azure icon master.
-Shapes get rounded corners and semi-transparent fills.`,
-  {
-    service: z
-      .string()
-      .describe(
-        'Azure service name. Supports exact keys like "azure/front-door" or fuzzy names like "Front Door", "SQL Database", "VM Scale Sets". Use list_azure_services to see all 206 available services.',
-      ),
-    x: z.number().describe("Horizontal position in inches from left edge."),
-    y: z.number().describe("Vertical position in inches from bottom edge."),
-    text: z
-      .string()
-      .optional()
-      .describe("Optional label (defaults to the master shape name)."),
-    width: z
-      .number()
-      .optional()
-      .describe("Width in inches (0 = default stencil size)."),
-    height: z
-      .number()
-      .optional()
-      .describe("Height in inches (0 = default stencil size)."),
-    fill_color: z
-      .string()
-      .optional()
-      .describe("Optional fill color override (hex RGB or named Azure color)."),
-  },
-  async ({ service, x, y, text, width, height, fill_color }) => {
-    try {
-      const result = visio.addAzureShape(
-        service,
-        x,
-        y,
-        text ?? "",
-        width ?? 0,
-        height ?? 0,
-        fill_color,
-      );
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "remove_shape",
-  "Remove a shape from the active page by its ID.",
-  {
-    shape_id: z
-      .number()
-      .describe("The numeric ID of the shape (from add_shape or list_shapes)."),
-  },
-  async ({ shape_id }) => {
-    try {
-      const msg = visio.removeShape(shape_id);
-      return { content: [{ type: "text", text: msg }] };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "modify_shape",
-  "Modify properties of an existing shape.",
-  {
-    shape_id: z.number().describe("The shape's numeric ID."),
-    text: z
-      .string()
-      .optional()
-      .describe("New text label (or omit to keep current)."),
-    x: z
-      .number()
-      .optional()
-      .describe("New X position in inches (or omit to keep)."),
-    y: z
-      .number()
-      .optional()
-      .describe("New Y position in inches (or omit to keep)."),
-    width: z
-      .number()
-      .optional()
-      .describe("New width in inches (or omit to keep)."),
-    height: z
-      .number()
-      .optional()
-      .describe("New height in inches (or omit to keep)."),
-    fill_color: z
-      .string()
-      .optional()
-      .describe(
-        'Fill color as hex RGB (e.g. "FF0000") or named Azure color.',
-      ),
-  },
-  async ({ shape_id, text, x, y, width, height, fill_color }) => {
-    try {
-      const result = visio.modifyShape(
-        shape_id,
-        text,
+      const result = engine.addElement(
+        element_type,
         x,
         y,
         width,
         height,
-        fill_color,
+        text,
+        stroke_color,
+        background_color,
+        fill_style,
+        stroke_style,
+        stroke_width,
+        opacity,
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -288,18 +167,156 @@ server.tool(
 );
 
 server.tool(
-  "list_shapes",
-  "List all shapes on the active Visio page. Returns JSON array with each shape's id, name, text, position, and size.",
+  "add_azure_icon",
+  `Add an Azure service icon to the diagram.
+Embeds the official Azure SVG icon as an image element.
+Use list_azure_services to see all available service keys.`,
+  {
+    service: z
+      .string()
+      .describe('Azure service key (e.g. "azure/front-door", "azure/sql-database", "azure/kubernetes-services"). Use list_azure_services to see all available keys.'),
+    x: z.number().describe("X position in pixels from left edge."),
+    y: z.number().describe("Y position in pixels from top edge."),
+    label: z.string().optional().describe("Optional text label below the icon (defaults to the service name)."),
+    width: z.number().optional().describe("Icon width in pixels (default 48)."),
+    height: z.number().optional().describe("Icon height in pixels (default 48)."),
+  },
+  async ({ service, x, y, label, width, height }) => {
+    try {
+      const iconEntry = Object.hasOwn(AZURE_ICONS, service) ? AZURE_ICONS[service] : undefined;
+      if (!iconEntry) {
+        const available = Object.keys(AZURE_ICONS).sort();
+        throw new Error(
+          `Unknown Azure service: "${service}". Use list_azure_services to see available keys. Closest matches: ${available.filter((k) => k.includes(service.split("/").pop() ?? "")).join(", ") || "none"}`,
+        );
+      }
+
+      const displayLabel = label ?? service.split("/").pop()?.replace(/-/g, " ") ?? service;
+      const result = engine.addAzureIcon(
+        service,
+        iconEntry.svgDataUrl,
+        x,
+        y,
+        width ?? 48,
+        height ?? 48,
+        displayLabel,
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
+  "add_text",
+  "Add a floating text label at the given position.",
+  {
+    x: z.number().describe("X position in pixels."),
+    y: z.number().describe("Y position in pixels."),
+    text: z.string().describe("The text to display."),
+    font_size: z.number().optional().describe("Font size in pixels (default 16)."),
+    text_align: z
+      .enum(["left", "center", "right"])
+      .optional()
+      .describe("Text alignment. Defaults to left."),
+  },
+  async ({ x, y, text, font_size, text_align }) => {
+    try {
+      const result = engine.addText(x, y, text, font_size, text_align);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
+  "modify_element",
+  "Modify properties of an existing element. Only provided properties are changed; others keep their current values.",
+  {
+    element_id: z.string().describe("The element's unique ID (from add_element, add_azure_icon, or list_elements)."),
+    x: z.number().optional().describe("New X position (or omit to keep current)."),
+    y: z.number().optional().describe("New Y position (or omit to keep current)."),
+    width: z.number().optional().describe("New width (or omit to keep current)."),
+    height: z.number().optional().describe("New height (or omit to keep current)."),
+    text: z.string().optional().describe("New text label (or omit to keep current)."),
+    stroke_color: z.string().optional().describe("New stroke color (hex or named Azure color)."),
+    background_color: z.string().optional().describe("New fill color (hex or named Azure color)."),
+    fill_style: z.enum(["solid", "hachure", "cross-hatch"]).optional().describe("New fill pattern style."),
+    stroke_style: z.enum(["solid", "dashed", "dotted"]).optional().describe("New stroke line style."),
+    stroke_width: z.number().optional().describe("New stroke width."),
+    opacity: z.number().min(0).max(100).optional().describe("New opacity (0-100)."),
+  },
+  async ({ element_id, x, y, width, height, text, stroke_color, background_color, fill_style, stroke_style, stroke_width, opacity }) => {
+    try {
+      const result = engine.modifyElement(element_id, {
+        x,
+        y,
+        width,
+        height,
+        text,
+        strokeColor: stroke_color,
+        backgroundColor: background_color,
+        fillStyle: fill_style,
+        strokeStyle: stroke_style,
+        strokeWidth: stroke_width,
+        opacity,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
+  "remove_element",
+  "Remove an element from the diagram by its ID.",
+  {
+    element_id: z.string().describe("The element's unique ID."),
+  },
+  async ({ element_id }) => {
+    try {
+      const msg = engine.removeElement(element_id);
+      return { content: [{ type: "text", text: msg }] };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
+  "list_elements",
+  "List all elements on the diagram. Returns JSON array with each element's id, type, position, size, and text.",
   {},
   async () => {
     try {
-      const shapes = visio.listShapes();
-      if (shapes.length === 0)
+      const elements = engine.listElements();
+      if (elements.length === 0)
         return {
-          content: [{ type: "text", text: "No shapes on the active page." }],
+          content: [{ type: "text", text: "No elements in the diagram." }],
         };
       return {
-        content: [{ type: "text", text: JSON.stringify(shapes, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(elements, null, 2) }],
       };
     } catch (e: unknown) {
       return {
@@ -313,49 +330,34 @@ server.tool(
 // ── Connections ──────────────────────────────────────────────
 
 server.tool(
-  "connect_shapes",
-  `Connect two shapes with a styled connector line.
-Automatically applies style-guide rules: filled triangle arrowheads, 1 pt line weight, 0.15 in rounding, 7 pt label font.`,
+  "add_arrow",
+  `Connect two elements with an arrow.
+Arrows automatically bind to the source and target elements.
+By default draws a one-directional arrow (source → target).`,
   {
-    from_shape_id: z.number().describe("ID of the source shape."),
-    to_shape_id: z.number().describe("ID of the target shape."),
-    label: z
-      .string()
+    from_id: z.string().describe("ID of the source element."),
+    to_id: z.string().describe("ID of the target element."),
+    label: z.string().optional().describe('Optional text label on the arrow (e.g. "HTTPS", "gRPC").'),
+    stroke_color: z.string().optional().describe("Arrow color (hex or named Azure color)."),
+    stroke_style: z
+      .enum(["solid", "dashed", "dotted"])
       .optional()
-      .describe('Optional text label on the connector (e.g. "HTTPS", "TDS").'),
-    connector_style: z
-      .enum(["straight", "curved", "right_angle"])
-      .optional()
-      .describe('One of "straight", "curved", or "right_angle".'),
-    dashed: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, uses dashed line (for failover, replication, secondary paths).",
-      ),
+      .describe("Line style. Use dashed for failover/replication paths."),
     bidirectional: z
       .boolean()
       .optional()
-      .describe(
-        "If true, arrows on both ends (for replication links).",
-      ),
+      .describe("If true, arrows on both ends (for replication links)."),
   },
-  async ({
-    from_shape_id,
-    to_shape_id,
-    label,
-    connector_style,
-    dashed,
-    bidirectional,
-  }) => {
+  async ({ from_id, to_id, label, stroke_color, stroke_style, bidirectional }) => {
     try {
-      const result = visio.connectShapes(
-        from_shape_id,
-        to_shape_id,
-        label ?? "",
-        connector_style ?? "straight",
-        dashed ?? false,
-        bidirectional ?? false,
+      const result = engine.addArrow(
+        from_id,
+        to_id,
+        label,
+        stroke_color,
+        stroke_style,
+        bidirectional ? "arrow" : undefined,
+        "arrow",
       );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -370,16 +372,14 @@ Automatically applies style-guide rules: filled triangle arrowheads, 1 pt line w
 );
 
 server.tool(
-  "remove_connection",
-  "Remove a connector by its ID.",
+  "remove_arrow",
+  "Remove an arrow by its ID. Also unbinds from connected elements.",
   {
-    connector_id: z
-      .number()
-      .describe("The numeric ID of the connector shape."),
+    arrow_id: z.string().describe("The arrow's unique ID."),
   },
-  async ({ connector_id }) => {
+  async ({ arrow_id }) => {
     try {
-      const msg = visio.removeConnection(connector_id);
+      const msg = engine.removeArrow(arrow_id);
       return { content: [{ type: "text", text: msg }] };
     } catch (e: unknown) {
       return {
@@ -390,50 +390,59 @@ server.tool(
   },
 );
 
-// ── Architecture Helpers ─────────────────────────────────────
+// ── Grouping & Layout ───────────────────────────────────────
+
+server.tool(
+  "add_frame",
+  `Add an Excalidraw frame for visually grouping elements.
+Frames provide a labeled boundary that can contain other elements.`,
+  {
+    x: z.number().describe("X position in pixels."),
+    y: z.number().describe("Y position in pixels."),
+    width: z.number().describe("Width in pixels."),
+    height: z.number().describe("Height in pixels."),
+    name: z.string().optional().describe("Frame label/title."),
+  },
+  async ({ x, y, width, height, name }) => {
+    try {
+      const result = engine.addFrame(x, y, width, height, name);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    } catch (e: unknown) {
+      return {
+        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  },
+);
 
 server.tool(
   "add_container",
-  `Add a container/boundary rectangle for visually grouping shapes.
-Styled per guide: dashed border, 60% transparent, 9 pt color-matched label at top.`,
+  `Add a styled container rectangle for visually grouping shapes.
+Styled per guide: dashed border, semi-transparent fill, with a label.
+Use for grouping related services (e.g. "Web Tier", "Availability Zone 1").`,
   {
-    x: z.number().describe("Center X position in inches."),
-    y: z.number().describe("Center Y position in inches."),
-    width: z.number().describe("Width in inches."),
-    height: z.number().describe("Height in inches."),
-    label: z
+    x: z.number().describe("X position in pixels."),
+    y: z.number().describe("Y position in pixels."),
+    width: z.number().describe("Width in pixels."),
+    height: z.number().describe("Height in pixels."),
+    label: z.string().optional().describe("Title text displayed at the top of the container."),
+    background_color: z
       .string()
       .optional()
-      .describe("Title text displayed at the top of the container."),
-    fill_color: z
-      .string()
-      .optional()
-      .describe(
-        'Fill color as hex RGB or named Azure color. Defaults to "E6F3FF" (light blue).',
-      ),
-    transparency: z
+      .describe('Fill color (hex or named Azure color). Defaults to light blue "#e6f3ff".'),
+    opacity: z
       .number()
+      .min(0)
+      .max(100)
       .optional()
-      .describe(
-        "Fill transparency from 0.0 (opaque) to 100 (invisible). Defaults to 60.",
-      ),
-    rounding: z
-      .number()
-      .optional()
-      .describe("Corner rounding in inches. Defaults to 0 (sharp corners)."),
+      .describe("Fill opacity from 0 (invisible) to 100 (fully opaque). Defaults to 40."),
   },
-  async ({ x, y, width, height, label, fill_color, transparency, rounding }) => {
+  async ({ x, y, width, height, label, background_color, opacity }) => {
     try {
-      const result = visio.addContainer(
-        x,
-        y,
-        width,
-        height,
-        label ?? "",
-        fill_color ?? "E6F3FF",
-        transparency,
-        rounding,
-      );
+      const result = engine.addContainer(x, y, width, height, label, background_color, opacity);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
@@ -446,231 +455,17 @@ Styled per guide: dashed border, 60% transparent, 9 pt color-matched label at to
   },
 );
 
-server.tool(
-  "add_tier_band",
-  `Add a horizontal tier band spanning the full page width.
-Styled per guide: 70% transparent, no border, bold 8 pt label on left margin.
-Use for separating architecture tiers (e.g. "Web Tier", "App Tier", "Data Tier").`,
-  {
-    y: z.number().describe("Center Y position in inches."),
-    height: z.number().describe("Band height in inches."),
-    label: z
-      .string()
-      .optional()
-      .describe('Tier label text (e.g. "Ingress", "Compute", "Data").'),
-    fill_color: z
-      .string()
-      .optional()
-      .describe("Fill color as hex RGB or named Azure color."),
-    transparency: z
-      .number()
-      .optional()
-      .describe("Fill transparency (0-100). Defaults to 70."),
-    rounding: z
-      .number()
-      .optional()
-      .describe("Corner rounding in inches. Defaults to 0."),
-  },
-  async ({ y, height, label, fill_color, transparency, rounding }) => {
-    try {
-      const result = visio.addTierBand(
-        y,
-        height,
-        label ?? "",
-        fill_color ?? "E6F3FF",
-        transparency,
-        rounding,
-      );
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "add_text_label",
-  "Add a floating text label (no border, no fill) at the given position.",
-  {
-    x: z.number().describe("X position in inches."),
-    y: z.number().describe("Y position in inches."),
-    text: z.string().describe("The text to display."),
-    font_size: z
-      .number()
-      .optional()
-      .describe("Font size in points (default 10)."),
-  },
-  async ({ x, y, text, font_size }) => {
-    try {
-      const result = visio.addTextLabel(x, y, text, font_size ?? 10);
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-// ── Stencil Discovery ───────────────────────────────────────
+// ── Discovery ───────────────────────────────────────────────
 
 server.tool(
   "list_azure_services",
-  `List all 206 available Azure service keys that can be used with add_azure_shape.
-Returns a sorted JSON array of service identifiers like "azure/front-door", "azure/sql-database", etc.`,
+  "List all available Azure service keys that can be used with add_azure_icon. Returns a sorted JSON array of service identifiers.",
   {},
   async () => {
-    const services = visio.listAzureServices();
+    const services = engine.listAzureServices(AZURE_ICONS);
     return {
       content: [{ type: "text", text: JSON.stringify(services, null, 2) }],
     };
-  },
-);
-
-server.tool(
-  "list_stencil_masters",
-  "List all master shape names in a given Azure stencil. Use this to discover what icons are available in a specific stencil.",
-  {
-    stencil_name: z
-      .string()
-      .describe(
-        'Stencil logical name (e.g. "Azure-Databases", "Azure-Compute", "Azure-Networking", "Azure-Web").',
-      ),
-  },
-  async ({ stencil_name }) => {
-    try {
-      const masters = visio.listStencilMasters(stencil_name);
-      return {
-        content: [{ type: "text", text: JSON.stringify(masters, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "open_stencil",
-  "Open an Azure stencil by name so its masters become available.",
-  {
-    stencil_name: z
-      .string()
-      .describe('Stencil logical name (e.g. "Azure-Databases").'),
-  },
-  async ({ stencil_name }) => {
-    try {
-      const name = visio.openStencil(stencil_name);
-      return {
-        content: [{ type: "text", text: `Opened stencil: ${name}` }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-// ── Page Operations ──────────────────────────────────────────
-
-server.tool(
-  "add_page",
-  "Add a new page to the active Visio document.",
-  {
-    name: z
-      .string()
-      .optional()
-      .describe('Optional name for the new page (e.g. "Network Layer").'),
-  },
-  async ({ name }) => {
-    try {
-      const result = visio.addPage(name ?? "");
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "set_active_page",
-  "Switch to a specific page by its index (1-based).",
-  {
-    page_index: z
-      .number()
-      .describe("The page number to activate (1 = first page)."),
-  },
-  async ({ page_index }) => {
-    try {
-      const msg = visio.setActivePage(page_index);
-      return { content: [{ type: "text", text: msg }] };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-server.tool(
-  "list_pages",
-  "List all pages in the active Visio document.",
-  {},
-  async () => {
-    try {
-      const pages = visio.listPages();
-      return {
-        content: [{ type: "text", text: JSON.stringify(pages, null, 2) }],
-      };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
-  },
-);
-
-// ── Export ───────────────────────────────────────────────────
-
-server.tool(
-  "export_page",
-  'Export the active page as an image (PNG, SVG, JPG, etc.). The format is determined by the file extension.',
-  {
-    file_path: z
-      .string()
-      .describe(
-        'Output path, e.g. "C:/Users/me/diagram.png" or "output.svg".',
-      ),
-  },
-  async ({ file_path }) => {
-    try {
-      const path = visio.exportPage(file_path);
-      return { content: [{ type: "text", text: `Exported to: ${path}` }] };
-    } catch (e: unknown) {
-      return {
-        content: [{ type: "text", text: `Error: ${(e as Error).message}` }],
-        isError: true,
-      };
-    }
   },
 );
 
@@ -679,7 +474,7 @@ server.tool(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Visio MCP Server running on stdio");
+  console.error("Excalidraw MCP Server running on stdio");
 }
 
 main().catch((error) => {

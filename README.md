@@ -1,48 +1,43 @@
-# Visio MCP Server
+# Excalidraw MCP Server
 
-An MCP server that exposes Microsoft Visio diagram operations as tools — generate production-grade Azure architecture diagrams from text descriptions.
+An MCP server that exposes Excalidraw diagram operations as tools — generate Azure architecture diagrams from text descriptions.
+
+Cross-platform, zero native dependencies. Works on macOS, Linux, and Windows.
 
 Built for **GitHub Copilot CLI** and **VS Code Agent Mode**, but works with any MCP client.
 
-## Demo
-
-<p align="center">
-  <img src="assets/demo.gif" alt="Visio MCP Server Demo" width="720">
-</p>
-
 ## Features
 
-- **Azure service icons** — 206 Azure services from official Visio stencils
-- **Architecture helpers** — tier bands, containers, connectors with style-guide compliance
-- **Shape operations** — add, modify, remove, connect, and list shapes
-- **Multi-page support** — add pages, switch between them
-- **Export** — PNG, SVG, JPG output
-- **Zero native deps** — uses PowerShell COM interop, no compilation required
+- **Azure service icons** — 80+ Azure services with SVG icons (run `npm run build:icons` for the full 206)
+- **Architecture helpers** — containers, frames, arrows with style-guide compliance
+- **Element operations** — add, modify, remove, connect, and list elements
+- **Multiple shape types** — rectangle, ellipse, diamond with full styling
+- **Export** — `.excalidraw` (native), SVG, PNG, JPG output
+- **Cross-platform** — pure Node.js, no COM interop or native addons
 
 ## Prerequisites
 
-- **Windows** with **Microsoft Visio Professional** (installed and licensed)
 - **Node.js 18+**
-- **PowerShell** (comes with Windows)
-- **Azure Visio stencils** — download from [Microsoft Azure Architecture Icons](https://learn.microsoft.com/en-us/azure/architecture/icons/) and extract to your `My Shapes` folder
+
+That's it. No Windows, no Visio, no PowerShell required.
 
 ## Installation
 
 ```bash
-npm install -g mcp-server-visio
+npm install -g mcp-server-excalidraw
 ```
 
 Or run directly without installing:
 
 ```bash
-npx mcp-server-visio
+npx mcp-server-excalidraw
 ```
 
 Or clone for local development:
 
 ```bash
-git clone https://github.com/ragmha/mcp-server-visio.git
-cd mcp-server-visio
+git clone https://github.com/ragmha/mcp-server-excalidraw.git
+cd mcp-server-excalidraw
 npm install
 npm run build
 npm start
@@ -57,10 +52,10 @@ Add to `~/.copilot/mcp-config.json`:
 ```json
 {
   "mcpServers": {
-    "visio": {
+    "excalidraw": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-server-visio"]
+      "args": ["-y", "mcp-server-excalidraw"]
     }
   }
 }
@@ -73,10 +68,10 @@ Add to `.vscode/mcp.json` or user settings:
 ```json
 {
   "mcpServers": {
-    "visio": {
+    "excalidraw": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-server-visio"]
+      "args": ["-y", "mcp-server-excalidraw"]
     }
   }
 }
@@ -84,54 +79,70 @@ Add to `.vscode/mcp.json` or user settings:
 
 ### Whitelisting Tools
 
-Auto-approve all Visio tools:
+Auto-approve all Excalidraw tools:
 
 ```bash
-copilot --allow-tool "visio"
+copilot --allow-tool "excalidraw"
 ```
 
 Or persist in `~/.copilot/config.json`:
 
 ```json
 {
-  "allowedTools": ["visio"]
+  "allowedTools": ["excalidraw"]
 }
 ```
 
 ## Available Tools
 
+### Document Management
+
 | Tool | Description |
 |---|---|
-| `create_diagram` | Create a new Visio diagram (landscape, 11×8.5 in) |
-| `save_diagram` | Save to `.vsdx` file |
-| `close_diagram` | Close without saving |
-| `list_open_diagrams` | List all open documents |
-| `add_shape` | Add basic shapes (rectangle, ellipse, diamond, etc.) |
-| `add_azure_shape` | Add Azure service icons from official stencils |
-| `remove_shape` | Remove a shape by ID |
-| `modify_shape` | Change text, position, size, or color |
-| `list_shapes` | List all shapes on the active page |
-| `connect_shapes` | Connect two shapes with styled connectors |
-| `remove_connection` | Remove a connector |
-| `add_container` | Add a grouping boundary rectangle |
-| `add_tier_band` | Add a full-width horizontal tier band |
-| `add_text_label` | Add a floating text label |
-| `list_azure_services` | List all 206 available Azure service keys |
-| `list_stencil_masters` | List masters in a specific stencil |
-| `open_stencil` | Open an Azure stencil by name |
-| `add_page` | Add a new page |
-| `set_active_page` | Switch to a page by index |
-| `list_pages` | List all pages |
-| `export_page` | Export page as image (PNG, SVG, JPG) |
+| `create_diagram` | Create a new Excalidraw diagram |
+| `save_diagram` | Save to `.excalidraw` file |
+| `export_diagram` | Export as PNG, SVG, or JPG |
+| `get_diagram_info` | Get element count, bounding box summary |
+
+### Element Operations
+
+| Tool | Description |
+|---|---|
+| `add_element` | Add rectangle, ellipse, or diamond shapes |
+| `add_azure_icon` | Add Azure service icon (embedded SVG) |
+| `add_text` | Add a floating text label |
+| `modify_element` | Change position, size, color, text, or style |
+| `remove_element` | Remove an element by ID |
+| `list_elements` | List all elements with properties |
+
+### Connections
+
+| Tool | Description |
+|---|---|
+| `add_arrow` | Connect two elements with a styled arrow |
+| `remove_arrow` | Remove an arrow by ID |
+
+### Grouping & Layout
+
+| Tool | Description |
+|---|---|
+| `add_frame` | Add an Excalidraw frame (grouping boundary) |
+| `add_container` | Add a styled container rectangle |
+
+### Discovery
+
+| Tool | Description |
+|---|---|
+| `list_azure_services` | List all available Azure service keys |
 
 ## Style Guide
 
-All shapes and connectors are automatically styled per `STYLE_GUIDE.md`:
+All elements are automatically styled per `STYLE_GUIDE.md`:
 
-- **Shapes**: rounded corners (0.06 in), 15% transparent fills
-- **Connectors**: filled triangle arrowheads, 1 pt weight, 7 pt label font
-- **Containers**: dashed border, 60% transparent, 9 pt label
-- **Tier bands**: 70% transparent, bold 8 pt label
+- **Shapes**: clean lines (roughness=0), solid fills, 2px stroke
+- **Arrows**: arrowhead endpoints, 2px stroke, dashed for failover paths
+- **Containers**: dashed border, 40% opacity fill, 14px label
+- **Layout**: top-to-bottom flow, ~1056×816px canvas
 
 ## Example
 
@@ -139,32 +150,45 @@ All shapes and connectors are automatically styled per `STYLE_GUIDE.md`:
 Create a 3-tier Azure architecture with Front Door, VM Scale Sets in 2 availability zones, and Azure SQL with replication
 ```
 
-The server will create a professional Visio diagram with proper Azure icons, tier bands, containers, and styled connectors.
+The server will create an Excalidraw diagram with Azure icons, containers, and styled arrows. Save as `.excalidraw` to open in [excalidraw.com](https://excalidraw.com) or the Excalidraw VS Code extension.
 
 ## Architecture
 
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client<br/>(Copilot CLI / VS Code)
-    participant Server as Visio MCP Server<br/>(Node.js)
-    participant PS as PowerShell<br/>(COM Interop)
-    participant Visio as Microsoft Visio
+    participant Server as Excalidraw MCP Server<br/>(Node.js)
+    participant FS as File System
 
-    Client->>Server: tools/call → add_azure_shape("Front Door", 5, 7)
-    Server->>Server: Resolve stencil + escape inputs
-    Server->>PS: Execute .ps1 script
-    PS->>Visio: COM: Documents.OpenEx("Azure-Web.vssx")
-    PS->>Visio: COM: Page.Drop(master, x, y)
-    PS->>Visio: COM: Apply style guide (rounding, transparency)
-    Visio-->>PS: Shape ID + properties
-    PS-->>Server: JSON result
-    Server-->>Client: { id: 42, name: "Front Door", ... }
+    Client->>Server: tools/call → add_azure_icon("azure/front-door", 100, 50)
+    Server->>Server: Resolve SVG icon, create element
+    Server->>Server: Update in-memory scene JSON
+    Server-->>Client: { id: "abc123", type: "image", ... }
+
+    Client->>Server: tools/call → save_diagram("arch.excalidraw")
+    Server->>FS: Write JSON to file
+    Server-->>Client: "Saved to: /path/arch.excalidraw"
+
+    Client->>Server: tools/call → export_diagram("arch.png")
+    Server->>Server: Generate SVG from scene
+    Server->>Server: Rasterize SVG → PNG (sharp)
+    Server->>FS: Write PNG to file
+    Server-->>Client: "Exported to: /path/arch.png"
 ```
 
 - **MCP Client** sends tool calls over stdio
-- **Visio MCP Server** validates inputs, resolves Azure stencils, and generates PowerShell scripts
-- **PowerShell** executes COM automation against Visio — no native Node.js addons required
-- **Microsoft Visio** renders shapes, connectors, and exports diagrams
+- **Excalidraw MCP Server** validates inputs, manages in-memory scene, and generates output
+- **File System** receives `.excalidraw` JSON files or rendered images
+
+## Building Azure Icons
+
+To get the full set of official Microsoft Azure Architecture Icons:
+
+```bash
+npm run build:icons
+```
+
+This downloads the [Azure Public Service Icons](https://learn.microsoft.com/en-us/azure/architecture/icons/) SVG pack, base64-encodes them, and generates `src/azure-icons.ts`. Without running this, placeholder icons are used.
 
 ## License
 
